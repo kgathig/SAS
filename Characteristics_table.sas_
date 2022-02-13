@@ -1,0 +1,117 @@
+proc datasets library=work kill nolist;
+run;
+
+Proc import datafile = '/home/gathigiakelvin0/Impact Project data collection.xlsx' out = impactcase dbms=xlsx replace;
+  sheet='Impact Project data collection';
+  getnames= YES;
+run;
+data impactcase1;
+  set impactcase;
+  BMI1=input(compress(BMI,".","kd"),best.);
+run;
+
+proc format;
+  invalue fmt "F", "Female" = 1
+                "M", "Male"= 2
+                "Y", "Yes"=3
+                 "N", "No"=4;
+  value $infmt 1= "Female"
+                  2= "Male"
+                  3="Yes"
+                  4="No";
+  value $racefmt 1 ="African American"
+                  2 = "Caucasian"
+                  3 ="Latino"
+                  4 ="Asian";
+  invalue sortfmt "Age"=1
+                   "Sex"=2
+                   "Race"=3
+                   "BMI"=4
+                   "Risk Factors"=5;
+run;         
+
+%macro count(var =, col1 = , cat=);       
+proc freq data=impactcase1;
+   tables &var. / out= count_&var.;
+run;
+
+data count1_&var. (keep=col1-col3 cat order order2);
+  length col1-col3 $50;
+  set count_&var.;
+  col1=&col1;
+  %if &var. ne race %then %do;
+  col2= put(strip(input(&var.,fmt.)), infmt.);
+  order2=input(col2,fmt.);
+  %end;
+  %else %do ;
+  col2= put(strip(&var.), racefmt.);
+   order2=&var.;
+  %end;
+  col3=strip(put(count,best.))||" ("||strip(put(percent,5.1))||")";
+  cat=&cat.;
+  order=input(cat, sortfmt.);
+run;
+%mend count;
+%count(var = sex, col1="Sex", cat="Sex");
+%count(var = race, col1="Race", cat="Race");
+%count(var = DM, col1= "Diabetes", cat="Risk Factors");
+%count(var = HTN, col1="Hypertension", cat="Risk Factors");
+%count(var = Smoker, col1="Smoking Status", cat="Risk Factors");
+%count(var = Illicit_drug_use, col1="Illicit drug use", cat="Risk Factors");
+
+data counts;
+  set count1:;
+run;
+
+proc sort data=counts;
+  by order cat col1 order2 col2;
+run;
+
+data All_counts;
+  set counts;
+  by order cat col1 order2 col2;
+  output;
+  if first.col1 and cat="Risk Factors" then do;
+    col2=col1;
+    col3="";
+    output;
+   end;
+run;
+
+%macro means(var=);
+proc means  data=impactcase1;
+  var &var. ;
+  output out = mean_&var.(drop =_type_ _freq_)
+  n=n
+  mean=mean
+  median=median
+  min=min
+  max=max
+  std=std;
+run;
+
+proc transpose data=mean_&var. out=mean1_&var.;
+  var n mean median min max std;
+run;
+
+data mean2_&var.;
+  set mean1_&var.;
+  col1=_NAME_;
+  if _NAME_= "n" then col3=col1;
+  else if _NAME_ = ""
+ 
+run;
+
+%mend means;
+%means(var=age);
+%means(var=BMI1);
+
+data all_means;
+  set mean1_age mean1_BMI1;
+run;
+
+
+
+
+
+
